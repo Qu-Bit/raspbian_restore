@@ -484,8 +484,9 @@ fi
 
 sleep 5
 #sed -i 's/-03/-02/' /boot/cmdline.txt
+sed -i 's/\(root=PARTUUID=\w\+\)-03/\1-02/' /boot/cmdline.txt
 # for non UUID addressing
-sed -i 's?\(root=/dev/\w\+\)p3?\1p2?' /boot/cmdline.txt
+#sed -i 's?\(root=/dev/\w\+\)p3?\1p2?' /boot/cmdline.txt
 touch /boot/ssh
 reboot
 
@@ -505,8 +506,9 @@ fi
 echo Rebooting to root partition in 5 seconds
 sleep 5
 #sed -i 's/-02/-03/' /boot/cmdline.txt
+sed -i 's/\(root=PARTUUID=\w\+\)-02/\1-03/' /boot/cmdline.txt
 # for non UUID addressing
-sed -i 's?\(root=/dev/\w\+\)p2?\1p3?' /boot/cmdline.txt
+#sed -i 's?\(root=/dev/\w\+\)p2?\1p3?' /boot/cmdline.txt
 touch /boot/ssh
 reboot
 exit 0
