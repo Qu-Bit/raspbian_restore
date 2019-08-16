@@ -113,6 +113,21 @@ if [ $SOFTWARE_OK == 1 ]; then
 
 fi
 
+select_file () {
+  # $1: title prompt
+  # $2: directory (./)
+  wd=${2:-.}
+  if [ -n $(which dialog) ]; then 
+	FILE=$(dialog --stdout --title "$1" --fselect ${wd}/ 16 72); 
+	#echo $FILE; 
+  else 
+	read -r -p "$1 (in ${wd})" FILE
+	FILE="${wd}/$FILE"
+  fi
+  #FILE=$(dialog --stdout --title "Please choose a file" --fselect $HOME/ 16 72)
+  echo $FILE
+}
+
 cat << EOF
 OK
 
@@ -120,7 +135,8 @@ Working Directory
 =================
 Please let me know your preferred location for a working directory
 EOF
-read -r -p "[./tmp]" response
+response=$(select_file "working directory [./tmp]" ".")
+#read -r -p "[./tmp]" response
 if [ -z $response ]; then
   WORKDIR="./tmp"
 else
@@ -142,19 +158,21 @@ EOF
 
 read -r -p "Would you like to check for the latest Raspbian Full and Lite versions online? [Y/n] " response
 if [[ "$response" =~ ^([nN][oO]|[nN])+$ ]]; then
-  read -r -p "Please enter the filename of Raspbian Lite (zip or img) in ${WORKDIR} " response
-  if [ ! -f "$WORKDIR/$response" ];then 
-    echo $WORKDIR/$response does not exist
+  #read -r -p "Please enter the filename of Raspbian Lite (zip or img) in ${WORKDIR} " response
+  response=$(select_file "Filename of Raspbian Lite (zip or img)" "$WORKDIR")
+  if [ ! -f "$response" ];then 
+    echo $response does not exist
     exit 1
   else
-    RASPBIAN_LITE_REDIR=$WORKSIR/$response
+    RASPBIAN_LITE_REDIR=$response
   fi
-  read -r -p "Please enter the filename of Raspbian Full (zip or img) in ${WORKDIR} " response
-  if [ ! -f "$WORKDIR/$response" ];then 
-    echo $WORKDIR/$response does not exist
+  #read -r -p "Please enter the filename of Raspbian Full (zip or img) in ${WORKDIR} " response
+  response=$(select_file "Filename of Raspbian Full (zip or img)" "$WORKDIR")
+  if [ ! -f "$response" ];then 
+    echo $response does not exist
     exit 1
   else
-    RASPBIAN_FULL_REDIR=$WORKSIR/$response
+    RASPBIAN_FULL_REDIR=$response
   fi
 else
 
@@ -169,13 +187,14 @@ else
 
 fi
 
-# ZIP filenames
+# this is determining basenames
 RASPBIAN_LITE=${RASPBIAN_LITE_REDIR##*\/}
 RASPBIAN_FULL=${RASPBIAN_FULL_REDIR##*\/}
+# Filenames without last extension
 RASPBIAN_LITE_BASE=${RASPBIAN_LITE%.*}
-
-# Filenames without extensions
 RASPBIAN_FULL_BASE=${RASPBIAN_FULL%.*}
+# TODO: determine the file type
+# file, gzip -l, unzip
 
 echo Target version for recovery partition is $RASPBIAN_LITE
 echo Target version for root partition is $RASPBIAN_FULL
@@ -187,27 +206,27 @@ Local Source Files
 EOF
 
 # Do we have an zip? Lite
-if [ ! -f "./tmp/$RASPBIAN_LITE_BASE.img" ]; then
+if [ ! -f "$WORKDIR/$RASPBIAN_LITE_BASE.img" ]; then
   echo $RASPBIAN_LITE_BASE.img not found
-  if [ ! -f "./tmp/$RASPBIAN_LITE" ]; then
+  if [ ! -f "$WORKDIR/$RASPBIAN_LITE" ]; then
     echo $RASPBIAN_LITE not found, downloading
-    curl -L $RASPBIAN_LITE_REDIR > ./tmp/$RASPBIAN_LITE
+    curl -L $RASPBIAN_LITE_REDIR > $WORKDIR/$RASPBIAN_LITE
   fi
   echo Unzipping $RASPBIAN_LITE
-  unzip ./tmp/$RASPBIAN_LITE -d ./tmp
+  unzip $WORKDIR/$RASPBIAN_LITE -d $WORKDIR
 else
   echo $RASPBIAN_LITE_BASE.img found
 fi
 
 # Do we have an img? Full
-if [ ! -f "./tmp/$RASPBIAN_FULL_BASE.img" ]; then
+if [ ! -f "$WORKDIR/$RASPBIAN_FULL_BASE.img" ]; then
   echo $RASPBIAN_FULL_BASE.img not found
-  if [ ! -f "./tmp/$RASPBIAN_FULL" ]; then
+  if [ ! -f "$WORKDIR/$RASPBIAN_FULL" ]; then
     echo $RASPBIAN_FULL not found, downloading
-    curl -L $RASPBIAN_FULL_REDIR > ./tmp/$RASPBIAN_FULL
+    curl -L $RASPBIAN_FULL_REDIR > $WORKDIR/$RASPBIAN_FULL
   fi
   echo Unzipping $RASPBIAN_FULL
-  unzip ./tmp/$RASPBIAN_FULL -d ./tmp
+  unzip $WORKDIR/$RASPBIAN_FULL -d $WORKDIR
 else
   echo $RASPBIAN_FULL_BASE.img found
 fi
@@ -228,34 +247,39 @@ else
   SECTORS=$response
 fi
 
-
-FAT_LENGTH=$(fdisk -lu ./tmp/$RASPBIAN_LITE_BASE.img | grep .img1 | sed -n "s/ \+/ /gp" | cut -d ' ' -f 2)
-PARTITION_1=$(fdisk -lu ./tmp/$RASPBIAN_LITE_BASE.img | grep .img1 | sed -n "s/ \+/ /gp" | cut -d ' ' -f 4)
-LITE_ROOT_LENGTH=$(fdisk -lu ./tmp/$RASPBIAN_LITE_BASE.img | grep .img2 | sed -n "s/ \+/ /gp" | cut -d ' ' -f 4)
-FULL_ROOT_LENGTH=$(fdisk -lu ./tmp/$RASPBIAN_FULL_BASE.img | grep .img2 | sed -n "s/ \+/ /gp" | cut -d ' ' -f 4)
+# TODO: functionalize
+# file, partition, start | end | size
+FAT_START=$(fdisk -lu $WORKDIR/$RASPBIAN_LITE_BASE.img | grep .img1 | sed -n "s/ \+/ /gp" | cut -d ' ' -f 2)
+PARTITION_1=$(fdisk -lu $WORKDIR/$RASPBIAN_LITE_BASE.img | grep .img1 | sed -n "s/ \+/ /gp" | cut -d ' ' -f 4)
+LITE_ROOT_LENGTH=$(fdisk -lu $WORKDIR/$RASPBIAN_LITE_BASE.img | grep .img2 | sed -n "s/ \+/ /gp" | cut -d ' ' -f 4)
+FULL_ROOT_LENGTH=$(fdisk -lu $WORKDIR/$RASPBIAN_FULL_BASE.img | grep .img2 | sed -n "s/ \+/ /gp" | cut -d ' ' -f 4)
+# lite needs to contain the full root image too
 PARTITION_2=$((LITE_ROOT_LENGTH+FULL_ROOT_LENGTH))
 
 cat << EOF
-FAT: $FAT_LENGTH sectors
+FAT: $FAT_START sectors
 Boot partition: $PARTITION_1 sectors
 Raspbian Lite partition: $PARTITION_2 sectors
 EOF
 
+size_1MB=$((1024**2))
+size_4MB=$((size_1MB * 4))
+
 if [ "$SECTORS" -eq 0 ]; then
   PARTITION_3="$FULL_ROOT_LENGTH"
-  SECTORS=$((FAT_LENGTH+PARTITION_1+PARTITION_2+FULL_ROOT_LENGTH))
-  IMAGE_4MB=$((((SECTORS * 512) / 4194304) + 1))
+  SECTORS=$((FAT_START+PARTITION_1+PARTITION_2+FULL_ROOT_LENGTH))
+  IMAGE_4MB=$((((SECTORS * 512) / size_4MB) + 1))
 else
   echo Calculating based on an available size of $SECTORS sectors
-  PARTITION_3=$((SECTORS-PARTITION_2-PARTITION_1-FAT_LENGTH))
-  IMAGE_4MB=$(((SECTORS * 512) / 4194304))
+  PARTITION_3=$((SECTORS-PARTITION_2-PARTITION_1-FAT_START))
+  IMAGE_4MB=$(((SECTORS * 512) / size_4MB))
   if [ $PARTITION_3 -lt 1 ]; then
     echo Too few sectors, unable to continue
     exit 1
   fi
 fi
 
-IMAGE_BYTES=$((IMAGE_4MB * 4194304))
+IMAGE_BYTES=$((IMAGE_4MB * size_4MB))
 
 cat << EOF
 Raspbian Full partition: $PARTITION_3 sectors
@@ -275,12 +299,21 @@ Create target image
 Creating a blank image $SECTORS sectors / $IMAGE_BYTES bytes / $IMAGE_4MB 4MB blocks
 EOF
 
-dd if=/dev/zero bs=4M count=$IMAGE_4MB status=progress > ./tmp/$RASPBIAN_FULL_BASE.restore.img
+response="y"
+if [ -f $WORKDIR/$RASPBIAN_FULL_BASE.restore.img ]; then
+  read -r -p "Target image exists - recreate it? [y/N] " response
+  if [[ "$response" =~ ^([Yy][Ee][Ss]|[Yy])+$ ]]; then
+	response="y"
+  fi
+fi
+if [ "$response" == "y"]; then
+  dd if=/dev/zero bs=4M count=$IMAGE_4MB status=progress > $WORKDIR/$RASPBIAN_FULL_BASE.restore.img
+fi
 
 UUID_RESTORE=$(uuidgen)
 UUID_ROOTFS=$(uuidgen)
 PARTUUID=$(tr -dc 'a-f0-9' < /dev/urandom 2>/dev/null | head -c8)
-PARTITION_2_START=$((FAT_LENGTH + PARTITION_1))
+PARTITION_2_START=$((FAT_START + PARTITION_1))
 PARTITION_3_START=$((PARTITION_2_START + PARTITION_2))
 
 cat << EOF
@@ -292,17 +325,17 @@ Root: $UUID_ROOTFS
 Volume ID: $PARTUUID
 
 Creating partition table
-Boot: start=${FAT_LENGTH}, size=${PARTITION_1}, type=c
+Boot: start=${FAT_START}, size=${PARTITION_1}, type=c
 Recovery: start=${PARTITION_2_START}, size=${PARTITION_2}, type=83
 Root: start=${PARTITION_3_START}, size=${PARTITION_3}, type=83
 EOF
 
-sfdisk ./tmp/$RASPBIAN_FULL_BASE.restore.img <<EOF
+sfdisk $WORKDIR/$RASPBIAN_FULL_BASE.restore.img <<EOF
 label: dos
 label-id: 0x${PARTUUID}
 unit: sectors
 
-$RASPBIAN_FULL_BASE.img1 : start=${FAT_LENGTH}, size=${PARTITION_1}, type=c
+$RASPBIAN_FULL_BASE.img1 : start=${FAT_START}, size=${PARTITION_1}, type=c
 $RASPBIAN_FULL_BASE.img2 : start=${PARTITION_2_START}, size=${PARTITION_2}, type=83
 $RASPBIAN_FULL_BASE.img3 : start=${PARTITION_3_START}, size=${PARTITION_3}, type=83
 EOF
@@ -313,34 +346,45 @@ Mount images as devices
 =======================
 EOF
 
-losetup -v -f ./tmp/$RASPBIAN_FULL_BASE.restore.img
-losetup -v -f ./tmp/$RASPBIAN_LITE_BASE.img
-losetup -v -f ./tmp/$RASPBIAN_FULL_BASE.img
+losetup -a
 
-BLANK_IMAGE_LOOPDEV=$(losetup -a | grep loop | grep $RASPBIAN_FULL_BASE.restore.img | cut -d ' ' -f 1 | tr -dc '0-9')
-kpartx -v -a /dev/loop$BLANK_IMAGE_LOOPDEV
+losetup -v -f $WORKDIR/$RASPBIAN_FULL_BASE.restore.img
+losetup -v -f $WORKDIR/$RASPBIAN_LITE_BASE.img
+losetup -v -f $WORKDIR/$RASPBIAN_FULL_BASE.img
+sleep 1
 
-LITE_IMAGE_LOOPDEV=$(losetup -a | grep loop | grep $RASPBIAN_LITE_BASE.img | cut -d ' ' -f 1 | tr -dc '0-9')
-kpartx -v -a /dev/loop$LITE_IMAGE_LOOPDEV
+BLANK_IMAGE_LOOPDEV=$(losetup -a | grep loop | grep $RASPBIAN_FULL_BASE.restore.img | cut -d ':' -f 1)
+#| cut -d ' ' -f 1 | tr -dc '0-9')
+echo "New image is device $BLANK_IMAGE_LOOPDEV"
+kpartx -v -a $BLANK_IMAGE_LOOPDEV
+sleep 1
 
-FULL_IMAGE_LOOPDEV=$(losetup -a | grep loop | grep $RASPBIAN_FULL_BASE.img | cut -d ' ' -f 1 | tr -dc '0-9')
-kpartx -v -a /dev/loop$FULL_IMAGE_LOOPDEV
+LITE_IMAGE_LOOPDEV=$(losetup -a | grep loop | grep $RASPBIAN_LITE_BASE.img | cut -d ':' -f 1)
+echo "Lite image is device $LITE_IMAGE_LOOPDEV"
+kpartx -v -a $LITE_IMAGE_LOOPDEV
+sleep 1
+
+FULL_IMAGE_LOOPDEV=$(losetup -a | grep loop | grep $RASPBIAN_FULL_BASE.img | cut -d ':' -f 1)
+echo "Full image is device $FULL_IMAGE_LOOPDEV"
+kpartx -v -a $FULL_IMAGE_LOOPDEV
+sleep 1
+
+BLANK_IMAGE_MAPDEV=/dev/mapper/$(basename $BLANK_IMAGE_LOOPDEV)
+LITE_IMAGE_MAPDEV=/dev/mapper/$(basename $LITE_IMAGE_LOOPDEV)
+FULL_IMAGE_MAPDEV=/dev/mapper/$(basename $FULL_IMAGE_LOOPDEV)
 
 cat << EOF
-New image is device $BLANK_IMAGE_LOOPDEV
-Lite image is device $LITE_IMAGE_LOOPDEV
-Full image is device $FULL_IMAGE_LOOPDEV
 
 Copy images
 ===========
 Copying boot partition
 EOF
 
-dd if=/dev/mapper/loop${LITE_IMAGE_LOOPDEV}p1 of=/dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p1 status=progress bs=4M
+dd if=${LITE_IMAGE_MAPDEV}p1 of=${BLANK_IMAGE_MAPDEV}p1 status=progress bs=4M
 echo Copying Raspbian Lite to partition 2
-dd if=/dev/mapper/loop${LITE_IMAGE_LOOPDEV}p2 of=/dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p2 status=progress bs=4M
+dd if=${LITE_IMAGE_MAPDEV}p2 of=${BLANK_IMAGE_MAPDEV}p2 status=progress bs=4M
 echo Copying Raspbian Full to partition 3
-dd if=/dev/mapper/loop${FULL_IMAGE_LOOPDEV}p2 of=/dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p3 status=progress bs=4M
+dd if=${FULL_IMAGE_MAPDEV}p2 of=${BLANK_IMAGE_MAPDEV}p3 status=progress bs=4M
 
 # This seems to be needed to let the system catch up
 sleep 1
@@ -352,13 +396,13 @@ Fix file systems
 Setting IDs
 EOF
 
-tune2fs /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p2 -U ${UUID_RESTORE}
-e2label /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p2 recoveryfs
-tune2fs /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p3 -U ${UUID_ROOTFS}
+tune2fs ${BLANK_IMAGE_MAPDEV}p2 -U ${UUID_RESTORE}
+e2label ${BLANK_IMAGE_MAPDEV}p2 recoveryfs
+tune2fs ${BLANK_IMAGE_MAPDEV}p3 -U ${UUID_ROOTFS}
 
 echo Expanding recovery partition to full size
-e2fsck -f /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p2
-resize2fs /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p2
+e2fsck -f ${BLANK_IMAGE_MAPDEV}p2
+resize2fs ${BLANK_IMAGE_MAPDEV}p2
 
 cat << EOF
 
@@ -371,11 +415,11 @@ mkdir -p tmp/mnt/restore_recovery
 mkdir -p tmp/mnt/restore_rootfs
 
 echo Mounting boot
-mount /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p1 tmp/mnt/restore_boot
+mount ${BLANK_IMAGE_MAPDEV}p1 tmp/mnt/restore_boot
 echo Mounting recovery
-mount /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p2 tmp/mnt/restore_recovery
+mount ${BLANK_IMAGE_MAPDEV}p2 tmp/mnt/restore_recovery
 echo Mounting rootfs
-mount /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p3 tmp/mnt/restore_rootfs
+mount ${BLANK_IMAGE_MAPDEV}p3 tmp/mnt/restore_rootfs
 
 sleep 1
 
@@ -390,18 +434,18 @@ echo
 echo Fix fstabs
 echo ==========
 
-UUID_BOOT=$(blkid -o export /dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p1 | egrep '^UUID=' | cut -d'=' -f2)
+UUID_BOOT=$(blkid -o export ${BLANK_IMAGE_MAPDEV}p1 | egrep '^UUID=' | cut -d'=' -f2)
 echo UUID for new image is $UUID_BOOT
 
 echo Writing root fstab
-cat << EOF > ./tmp/mnt/restore_rootfs/etc/fstab
+cat << EOF > tmp/mnt/restore_rootfs/etc/fstab
 proc                     /proc  proc    defaults          0       0
 UUID=${UUID_BOOT}  /boot  vfat    defaults          0       2
 UUID=${UUID_ROOTFS}  /      ext4    defaults,noatime  0       1
 EOF
 
 echo Writing recovery fstab
-cat << EOF > ./tmp/mnt/restore_recovery/etc/fstab
+cat << EOF > tmp/mnt/restore_recovery/etc/fstab
 proc                    /proc  proc    defaults          0       0
 UUID=${UUID_BOOT}       /boot  vfat    defaults          0       2
 UUID=${UUID_RESTORE}    /      ext4    defaults,noatime  0       1
@@ -424,7 +468,7 @@ echo Create recovery scripts
 echo ======================
 
 echo Creating boot_to_recovery
-cat << EOF > ./tmp/mnt/restore_boot/boot_to_recovery
+cat << EOF > tmp/mnt/restore_boot/boot_to_recovery
 #!/bin/bash
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
@@ -439,17 +483,19 @@ if [ "\$1" = "restore" ]; then
 fi
 
 sleep 5
-sed -i 's/-03/-02/' /boot/cmdline.txt
+#sed -i 's/-03/-02/' /boot/cmdline.txt
+# for non UUID addressing
+sed -i 's?\(root=/dev/\w\+\)p3?\1p2?' /boot/cmdline.txt
 touch /boot/ssh
 reboot
 
 exit 0
 EOF
 
-chmod +x ./tmp/mnt/restore_boot/boot_to_recovery
+chmod +x tmp/mnt/restore_boot/boot_to_recovery
 
 echo Creating boot_to_root
-cat << EOF > ./tmp/mnt/restore_boot/boot_to_root
+cat << EOF > tmp/mnt/restore_boot/boot_to_root
 #!/bin/bash
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
@@ -458,16 +504,18 @@ fi
 
 echo Rebooting to root partition in 5 seconds
 sleep 5
-sed -i 's/-02/-03/' /boot/cmdline.txt
+#sed -i 's/-02/-03/' /boot/cmdline.txt
+# for non UUID addressing
+sed -i 's?\(root=/dev/\w\+\)p2?\1p3?' /boot/cmdline.txt
 touch /boot/ssh
 reboot
 exit 0
 EOF
 
-chmod +x ./tmp/mnt/restore_boot/boot_to_root
+chmod +x tmp/mnt/restore_boot/boot_to_root
 
 echo Creating restore_root
-cat << EOF > ./tmp/mnt/restore_boot/restore_root
+cat << EOF > tmp/mnt/restore_boot/restore_root
 #!/bin/bash
 if [ -f "/boot/restore" ]; then
 	echo Restoring rootfs
@@ -478,10 +526,10 @@ fi
 exit 0
 EOF
 
-chmod +x ./tmp/mnt/restore_boot/restore_root
+chmod +x tmp/mnt/restore_boot/restore_root
 
 echo Creating check_restore_gpio
-cat << EOF > ./tmp/mnt/restore_boot/check_restore_gpio.py
+cat << EOF > tmp/mnt/restore_boot/check_restore_gpio.py
 import os
 from gpiozero import Button
 
@@ -495,14 +543,14 @@ else:
 EOF
 
 echo Scripts created, now modifying rc.locals
-sed -i '$ i /boot/restore_root' ./tmp/mnt/restore_recovery/etc/rc.local
-sed -i '$ i python3 /boot/check_restore_gpio.py' ./tmp/mnt/restore_rootfs/etc/rc.local
+sed -i '$ i /boot/restore_root' tmp/mnt/restore_recovery/etc/rc.local
+sed -i '$ i python3 /boot/check_restore_gpio.py' tmp/mnt/restore_rootfs/etc/rc.local
 
 # End of create recovery scripts
 fi
 
 echo Enabling SSH
-touch ./tmp/mnt/restore_boot/ssh
+touch tmp/mnt/restore_boot/ssh
 
 # Wifi
 cat << EOF
@@ -517,7 +565,7 @@ read -r -p "Country code (e.g. gb): " ccode
 read -r -p "SSID: " ssid
 read -r -p "PSK: " psk
 
-cat << EOF > ./tmp/mnt/restore_recovery/etc/wpa_supplicant/wpa_supplicant.conf
+cat << EOF > tmp/mnt/restore_recovery/etc/wpa_supplicant/wpa_supplicant.conf
 country=${ccode}
 update_config=1
 ctrl_interface=/var/run/wpa_supplicant
@@ -529,7 +577,7 @@ network={
 }
 EOF
 
-cat << EOF > ./tmp/mnt/restore_rootfs/etc/wpa_supplicant/wpa_supplicant.conf
+cat << EOF > tmp/mnt/restore_rootfs/etc/wpa_supplicant/wpa_supplicant.conf
 country=${ccode}
 update_config=1
 ctrl_interface=/var/run/wpa_supplicant
@@ -551,7 +599,7 @@ EOF
 
 read -r -p "Shall I image the current root partition to recovery? [Y/n] " response
 if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]] || [[ "$response" == "" ]]; then
-dd if=/dev/mapper/loop${BLANK_IMAGE_LOOPDEV}p3 of=./tmp/mnt/restore_recovery/rootfs.img status=progress bs=4M
+dd if=${BLANK_IMAGE_MAPDEV}p3 of=tmp/mnt/restore_recovery/rootfs.img status=progress bs=4M
 fi
 
 cat << EOF
@@ -563,11 +611,17 @@ EOF
 umount tmp/mnt/restore_boot
 umount tmp/mnt/restore_recovery
 umount tmp/mnt/restore_rootfs
-sleep 1
-kpartx -v -d /dev/loop${BLANK_IMAGE_LOOPDEV}
-kpartx -v -d /dev/loop${LITE_IMAGE_LOOPDEV}
-kpartx -v -d /dev/loop${FULL_IMAGE_LOOPDEV}
-losetup --detach-all
+sleep 5
+rm -rf tmp/
+
+kpartx -v -d ${BLANK_IMAGE_LOOPDEV}
+kpartx -v -d ${LITE_IMAGE_LOOPDEV}
+kpartx -v -d ${FULL_IMAGE_LOOPDEV}
+#losetup --detach-all
+losetup -d ${BLANK_IMAGE_LOOPDEV}
+losetup -d ${LITE_IMAGE_LOOPDEV}
+losetup -d ${FULL_IMAGE_LOOPDEV}
+
 echo Done
 
 exit 0
