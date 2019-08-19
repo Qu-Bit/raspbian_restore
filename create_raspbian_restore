@@ -468,85 +468,24 @@ echo Create recovery scripts
 echo ======================
 
 echo Creating boot_to_recovery
-cat << EOF > tmp/mnt/restore_boot/boot_to_recovery
-#!/bin/bash
-if [ "$EUID" -ne 0 ]
-  then echo "Please run as root"
-  exit
-fi
-
-echo Rebooting to recovery partition in 5 seconds
-
-if [ "\$1" = "restore" ]; then
-    echo Automatic restore selected
-    touch /boot/restore
-fi
-
-sleep 5
-#sed -i 's/-03/-02/' /boot/cmdline.txt
-sed -i 's/\(root=PARTUUID=\w\+\)-03/\1-02/' /boot/cmdline.txt
-# for non UUID addressing
-#sed -i 's?\(root=/dev/\w\+\)p3?\1p2?' /boot/cmdline.txt
-touch /boot/ssh
-reboot
-
-exit 0
-EOF
-
+cp -a control_scripts/boot_to_recovery tmp/mnt/restore_boot/
 chmod +x tmp/mnt/restore_boot/boot_to_recovery
 
 echo Creating boot_to_root
-cat << EOF > tmp/mnt/restore_boot/boot_to_root
-#!/bin/bash
-if [ "$EUID" -ne 0 ]
-  then echo "Please run as root"
-  exit
-fi
-
-echo Rebooting to root partition in 5 seconds
-sleep 5
-#sed -i 's/-02/-03/' /boot/cmdline.txt
-sed -i 's/\(root=PARTUUID=\w\+\)-02/\1-03/' /boot/cmdline.txt
-# for non UUID addressing
-#sed -i 's?\(root=/dev/\w\+\)p2?\1p3?' /boot/cmdline.txt
-touch /boot/ssh
-reboot
-exit 0
-EOF
-
+cp -a control_scripts/boot_to_root tmp/mnt/restore_boot/
 chmod +x tmp/mnt/restore_boot/boot_to_root
 
 echo Creating restore_root
-cat << EOF > tmp/mnt/restore_boot/restore_root
-#!/bin/bash
-if [ -f "/boot/restore" ]; then
-	echo Restoring rootfs
-	dd if=/rootfs.img of=/dev/mmcblk0p3 conv=fsync status=progress bs=4M
-	unlink /boot/restore
-	/boot/boot_to_root
-fi
-exit 0
-EOF
-
+cp -a control_scripts/restore_root tmp/mnt/restore_boot/
 chmod +x tmp/mnt/restore_boot/restore_root
 
-# TODO: backup_root
 #  like restore_root
-echo MISSING: Creating backup_root
+echo Creating backup_root
+cp -a control_scripts/backup_root tmp/mnt/restore_boot/
+chmod +x tmp/mnt/restore_boot/backup_root
 
 echo Creating check_restore_gpio
-cat << EOF > tmp/mnt/restore_boot/check_restore_gpio.py
-import os
-from gpiozero import Button
-
-button = Button(21)
-
-if button.is_pressed:
-    print("Restore button is pressed")
-    os.system("/boot/boot_to_recovery restore")
-else:
-    print("Restore button is not pressed")
-EOF
+cp -a control_scripts/check_restore_gpio.py tmp/mnt/restore_boot/
 
 echo Scripts created, now modifying rc.locals
 sed -i '$ i /boot/restore_root' tmp/mnt/restore_recovery/etc/rc.local

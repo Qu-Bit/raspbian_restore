@@ -5,7 +5,7 @@ if [ -f "/boot/restore" ]; then
 	  dcfldd if=/rootfs.img of=/dev/mmcblk0p3 bs=4M status=on statusinterval=4
 	else
 	  # status only in later versions of coreutils package
-      dd if=/rootfs.img of=/dev/mmcblk0p3 conv=fsync bs=4M #status=progress 
+	  dd if=/rootfs.img of=/dev/mmcblk0p3 conv=fsync bs=4M #status=progress 
 	fi
 	unlink /boot/restore
 	/boot/boot_to_root

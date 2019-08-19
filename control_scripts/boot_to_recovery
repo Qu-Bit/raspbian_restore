@@ -1,5 +1,10 @@
 #!/bin/bash
-if [ "0" -ne 0 ]
+# possible args:
+#   $1: ""
+#   $1: "restore" will cause reboot and overwrite of the root partition
+#   $1: "backup" will cause reboot and image-storing of the root partition
+
+if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit
 fi
