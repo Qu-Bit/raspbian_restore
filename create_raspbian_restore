@@ -530,6 +530,10 @@ EOF
 
 chmod +x tmp/mnt/restore_boot/restore_root
 
+# TODO: backup_root
+#  like restore_root
+echo MISSING: Creating backup_root
+
 echo Creating check_restore_gpio
 cat << EOF > tmp/mnt/restore_boot/check_restore_gpio.py
 import os
@@ -546,6 +550,7 @@ EOF
 
 echo Scripts created, now modifying rc.locals
 sed -i '$ i /boot/restore_root' tmp/mnt/restore_recovery/etc/rc.local
+sed -i '$ i /boot/backup_root' tmp/mnt/restore_recovery/etc/rc.local
 sed -i '$ i python3 /boot/check_restore_gpio.py' tmp/mnt/restore_rootfs/etc/rc.local
 
 # End of create recovery scripts

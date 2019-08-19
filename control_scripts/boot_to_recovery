@@ -1,0 +1,25 @@
+#!/bin/bash
+if [ "0" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
+
+echo Rebooting to recovery partition in 5 seconds
+
+if [ "$1" = "restore" ]; then
+    echo Automatic restore selected
+    touch /boot/restore
+elif [ "$1" = "backup" ]; then
+    echo Automatic backup selected
+    touch /boot/backup
+fi
+
+sleep 5
+#sed -i 's/-03/-02/' /boot/cmdline.txt
+sed -i 's/\(root=PARTUUID=\w\+\)-03/\1-02/' /boot/cmdline.txt
+# for non UUID addressing
+#sed -i 's?\(root=/dev/\w\+\)p3?\1p2?' /boot/cmdline.txt
+touch /boot/ssh
+reboot
+
+exit 0

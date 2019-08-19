@@ -1,0 +1,8 @@
+#!/bin/bash
+if [ -f "/boot/backup" ]; then
+	echo Backing up rootfs
+	dd if=/dev/mmcblk0p3 of=/rootfs.img conv=fsync status=progress bs=4M
+	unlink /boot/backup
+	/boot/boot_to_root
+fi
+exit 0
