@@ -1,7 +1,12 @@
 #!/bin/bash
 if [ -f "/boot/restore" ]; then
 	echo Restoring rootfs
-	dd if=/rootfs.img of=/dev/mmcblk0p3 conv=fsync status=progress bs=4M
+	if [ -n "$(which dcfldd)" ]; then
+	  dcfldd if=/rootfs.img of=/dev/mmcblk0p3 bs=4M status=on statusinterval=4
+	else
+	  # status only in later versions of coreutils package
+      dd if=/rootfs.img of=/dev/mmcblk0p3 conv=fsync bs=4M #status=progress 
+	fi
 	unlink /boot/restore
 	/boot/boot_to_root
 fi
