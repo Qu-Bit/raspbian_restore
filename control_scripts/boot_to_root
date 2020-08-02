@@ -6,10 +6,17 @@ fi
 
 echo Rebooting to root partition in 5 seconds
 sleep 5
+# changing boot partition 2 to 3
 #sed -i 's/-02/-03/' /boot/cmdline.txt
 sed -i 's/\(root=PARTUUID=\w\+\)-02/\1-03/' /boot/cmdline.txt
 # for non UUID addressing
 #sed -i 's?\(root=/dev/\w\+\)p2?\1p3?' /boot/cmdline.txt
+
+## requiring labeled partition
+#part_label="rootfs"
+#partuuid=$(lsblk -r -o label,PARTUUID | grep "$part_label" | cut -f2 -d' ')
+#sed -i 's/\(root=PARTUUID=\)\S\+/\1'${partuuid}'/' /boot/cmdline.txt
+
 touch /boot/ssh
 reboot
 exit 0

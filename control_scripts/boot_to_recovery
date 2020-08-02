@@ -20,11 +20,17 @@ elif [ "$1" = "backup" ]; then
 fi
 
 sleep 5
+# changing boot partition 3 to 2
 #sed -i 's/-03/-02/' /boot/cmdline.txt
 sed -i 's/\(root=PARTUUID=\w\+\)-03/\1-02/' /boot/cmdline.txt
 # for non UUID addressing
 #sed -i 's?\(root=/dev/\w\+\)p3?\1p2?' /boot/cmdline.txt
+
+## requiring labeled partition
+#part_label="recoveryfs"
+#partuuid=$(lsblk -r -o label,PARTUUID | grep "$part_label" | cut -f2 -d' ')
+#sed -i 's/\(root=PARTUUID=\)\S\+/\1'${partuuid}'/' /boot/cmdline.txt
+
 touch /boot/ssh
 reboot
-
 exit 0
