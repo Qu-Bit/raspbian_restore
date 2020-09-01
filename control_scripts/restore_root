@@ -1,13 +1,24 @@
 #!/bin/bash
+# NOTE: this should only be run when on recovery
+
 if [ -f "/boot/restore" ]; then
-	echo Restoring rootfs
-	if [ -n "$(which dcfldd)" ]; then
-	  dcfldd if=/rootfs.img of=/dev/mmcblk0p3 bs=4M status=on statusinterval=4
-	else
-	  # status only in later versions of coreutils package
-	  dd if=/rootfs.img of=/dev/mmcblk0p3 conv=fsync bs=4M #status=progress 
-	fi
-	unlink /boot/restore
-	/boot/boot_to_root
+  # script triggered backup
+  echo Restoring rootfs
+  # status only in later versions of coreutils package
+  dd if=/rootfs.img of=/dev/mmcblk0p3 conv=fsync bs=4M #status=progress 
+
+  unlink /boot/restore
+  /boot/boot_to_root
+else
+  # status output only makes sense in interactive session
+  read -p "Restoring rootfs from /rootfs.img ? (N/y): " ans
+  [ "$ans" != "y" ] && echo "ABORTING." && exit 1
+
+  if [ -n "$(which dcfldd)" ]; then
+	dcfldd if=/rootfs.img of=/dev/mmcblk0p3 bs=4M status=on statusinterval=4
+  else
+	# status only in later versions of coreutils package
+	dd if=/rootfs.img of=/dev/mmcblk0p3 conv=fsync bs=4M #status=progress 
+  fi
 fi
 exit 0
