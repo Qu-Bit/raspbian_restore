@@ -4,6 +4,14 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
+# to get the partition uuid
+source /boot/rescue_helpers.sh
+
+if [ "$(rootpart_label)" == "rootfs" ]; then
+    echo "/ is mounted on partition 'rootfs' already"
+    exit
+fi
+
 echo Rebooting to root partition in 5 seconds
 sleep 5
 # changing boot partition to rootfs
@@ -14,8 +22,9 @@ sleep 5
 #sed -i 's?\(root=/dev/\w\+\)p2?\1p3?' /boot/cmdline.txt
 
 #   solution requiring labeled partition
-part_label="rootfs"
-partuuid=$(lsblk -r -o label,PARTUUID | grep "$part_label" | cut -f2 -d' ')
+#part_label="rootfs"
+#partuuid=$(lsblk -r -o label,PARTUUID | grep "$part_label" | cut -f2 -d' ')
+partuuid=$(partlabel_uuid "rootfs")
 sed -i 's/\(root=PARTUUID=\)\S\+/\1'${partuuid}'/' /boot/cmdline.txt
 
 touch /boot/ssh

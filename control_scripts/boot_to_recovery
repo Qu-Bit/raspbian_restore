@@ -9,6 +9,15 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
+# to get the partition uuid
+source /boot/rescue_helpers.sh
+
+if [ "$(rootpart_label)" == "recoveryfs" ]; then
+    echo "/ is mounted on partition 'recoveryfs' already"
+    #echo "to be run only when / is mounted on partition 'rootfs'"
+    exit
+fi
+
 echo Rebooting to recovery partition in 5 seconds
 
 if [ "$1" = "restore" ]; then
@@ -28,8 +37,9 @@ sleep 5
 #sed -i 's?\(root=/dev/\w\+\)p3?\1p2?' /boot/cmdline.txt
 
 #   solution requiring labeled partition
-part_label="recoveryfs"
-partuuid=$(lsblk -r -o label,PARTUUID | grep "$part_label" | cut -f2 -d' ')
+#part_label="recoveryfs"
+#partuuid=$(lsblk -r -o label,PARTUUID | grep "$part_label" | cut -f2 -d' ')
+partuuid=$(partlabel_uuid "recoveryfs")
 sed -i 's/\(root=PARTUUID=\)\S\+/\1'${partuuid}'/' /boot/cmdline.txt
 
 touch /boot/ssh

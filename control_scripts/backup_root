@@ -1,14 +1,23 @@
 #!/bin/bash
-# NOTE: this should only be run when on recovery
-#	- as it requires sufficient space on the / to contain the backup image
-# TODO: implement check
+
+# to get the partition uuid
+source /boot/rescue_helpers.sh
+
+# ensure / is on recoveryfs
+if [ "$(rootpart_label)" != "recoveryfs" ]; then
+  echo "to be run only when / is mounted on partition 'recoveryfs'"
+  exit
+fi
+
+#inFile=/dev/mmcblk0p3
+inFile=/dev/disk/by-label/rootfs
 
 if [ -f "/boot/backup" ]; then
   # script triggered backup
   echo Backing up rootfs
   # status only in later versions of coreutils package
-  dd if=/dev/mmcblk0p3 of=/rootfs.img conv=fsync bs=4M #status=progress 
-
+  #dd if="$inFile" of=/rootfs.img conv=fsync status=progress bs=4M
+  dd if="$inFile" of=/rootfs.img conv=fsync bs=4M
   unlink /boot/backup
   /boot/boot_to_root
 else
@@ -17,10 +26,10 @@ else
   [ "$ans" != "y" ] && echo "ABORTING." && exit 1
 
   if [ -n "$(which dcfldd)" ]; then
-	dcfldd if=/dev/mmcblk0p3 of=/rootfs.img bs=4M status=on statusinterval=4
+	dcfldd if="$inFile" of=/rootfs.img bs=4M status=on statusinterval=4
   else
 	# status only in later versions of coreutils package
-	dd if=/dev/mmcblk0p3 of=/rootfs.img conv=fsync bs=4M #status=progress 
+	dd if="$inFile" of=/rootfs.img conv=fsync bs=4M #status=progress 
   fi
 fi
 exit 0
